@@ -1,4 +1,4 @@
-from transformers import pipeline
+from transformers import pipeline  # Note: We'll keep this for potential future use, but it’s not critical now
 from PIL import Image, ImageDraw, ImageFont
 import cv2
 import numpy as np
@@ -6,96 +6,172 @@ import os
 import requests
 import io
 from openai import OpenAI
-import torch
-
-# Initialize sentiment analyzer
-sentiment_analyzer = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 
 # Initialize OpenAI client with environment variable
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Placeholder for LLaMA API (e.g., Together AI or Replicate)
-LLAMA_API_URL = "https://api.together.ai/v1/chat/completions"
-LLAMA_API_KEY = os.getenv("LLAMA_API_KEY")
-
-# Template paths
+# Template paths with thematic keywords
 TEMPLATES_DIR = "backend/templates"
 TEMPLATES = {
-    "drake": {"path": os.path.join(TEMPLATES_DIR, "drake_hotline.jpg"), "tone": "satirical", "layout": "two_panel"},
-    "success_kid": {"path": os.path.join(TEMPLATES_DIR, "success_kid.jpg"), "tone": "positive", "layout": "single"},
-    "distracted_boyfriend": {"path": os.path.join(TEMPLATES_DIR, "distracted_boyfriend.jpg"), "tone": "humorous", "layout": "three_panel"},
-    "balloon_interruption": {"path": os.path.join(TEMPLATES_DIR, "balloon_interruption.jpg"), "tone": "humorous", "layout": "two_panel"},
-    "spongebob_transformation": {"path": os.path.join(TEMPLATES_DIR, "spongebob_transformation.jpg"), "tone": "positive", "layout": "five_panel"},
-    "classroom_rage": {"path": os.path.join(TEMPLATES_DIR, "classroom_rage.jpg"), "tone": "satirical", "layout": "two_panel"},
-    "doge_muscle": {"path": os.path.join(TEMPLATES_DIR, "doge_muscle.jpg"), "tone": "humorous", "layout": "two_panel"},
-    "incredibles_disapproval": {"path": os.path.join(TEMPLATES_DIR, "incredibles_disapproval.jpg"), "tone": "satirical", "layout": "two_panel"},
-    "winnie_pooh": {"path": os.path.join(TEMPLATES_DIR, "winnie_pooh.jpg"), "tone": "positive", "layout": "two_panel"}
+    "drake": {
+        "path": os.path.join(TEMPLATES_DIR, "drake_hotline.jpg"),
+        "tone": "satirical",
+        "layout": "two_panel",
+        "themes": ["contrast",  "preference"]
+    },
+    "success_kid": {
+        "path": os.path.join(TEMPLATES_DIR, "success_kid.jpg"),
+        "tone": "positive",
+        "layout": "single",
+        "themes": ["victory", "achievement"]
+    },
+    "distracted_boyfriend": {
+        "path": os.path.join(TEMPLATES_DIR, "distracted_boyfriend.jpg"),
+        "tone": "humorous",
+        "layout": "three_panel",
+        "themes": ["distraction", "ignoring", "chasing"]
+    },
+    "balloon_interruption": {
+        "path": os.path.join(TEMPLATES_DIR, "balloon_interruption.jpg"),
+        "tone": "humorous",
+        "layout": "two_panel",
+        "themes": ["interruption", "distraction"]
+    },
+    "spongebob_transformation": {
+        "path": os.path.join(TEMPLATES_DIR, "spongebob_transformation.jpg"),
+        "tone": "positive",
+        "layout": "five_panel",
+        "themes": ["transformation", "progression", "growth"]
+    },
+    "classroom_rage": {
+        "path": os.path.join(TEMPLATES_DIR, "classroom_rage.jpg"),
+        "tone": "satirical",
+        "layout": "two_panel",
+        "themes": ["rage", "frustration", "failure"]
+    },
+    "doge_muscle": {
+        "path": os.path.join(TEMPLATES_DIR, "doge_muscle.jpg"),
+        "tone": "humorous",
+        "layout": "two_panel",
+        "themes": ["transformation", "comparison", "strength"]
+    },
+    "incredibles_disapproval": {
+        "path": os.path.join(TEMPLATES_DIR, "incredibles_disapproval.jpg"),
+        "tone": "satirical",
+        "layout": "two_panel",
+        "themes": ["disapproval", "realization", "disappointment"]
+    },
+    "winnie_pooh": {
+        "path": os.path.join(TEMPLATES_DIR, "winnie_pooh.jpg"),
+        "tone": "positive",
+        "layout": "two_panel",
+        "themes": ["self-improvement", "smart", "realization"]
+    }
 }
 
 def analyze_text(text):
-    sentiment = sentiment_analyzer(text)[0]
-    text_lower = text.lower()
-    
-    # Enhanced tone detection with contextual keywords for news and general text
-    satirical_keywords = ["fail", "lose", "mess", "wrong", "disappoint", "rage", "scandal", "crisis", "collapse"]
-    humorous_keywords = ["distract", "ignore", "forget", "walk", "turn", "funny", "joke", "muscle", "lol"]
-    positive_keywords = ["win", "success", "great", "awesome", "transform", "smart", "victory", "achievement", "breakthrough"]
-    
-    if any(keyword in text_lower for keyword in satirical_keywords) or sentiment["label"] == "NEGATIVE":
-        tone = "satirical"
-    elif any(keyword in text_lower for keyword in humorous_keywords):
-        tone = "humorous"
-    elif any(keyword in text_lower for keyword in positive_keywords) or sentiment["label"] == "POSITIVE":
-        tone = "positive"
-    else:
-        tone = "humorous"  # Default to humorous for neutral cases
-    
-    print(f"Analyzed text: '{text}' | Detected tone: {tone} | Sentiment: {sentiment}")
-    return tone
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Use "gpt-4" if available
+            messages=[
+                {"role": "system", "content": "You are an expert in analyzing text to determine emotional tone and themes for meme generation."},
+                {"role": "user", "content": f"Analyze the following text and determine its emotional tone (satirical, humorous, positive) and specific themes (e.g., distraction, transformation, rage, victory). Return the result as a JSON object with 'tone' and 'themes' keys: {text}"}
+            ],
+            max_tokens=100,
+            temperature=0.3
+        )
+        analysis = response.choices[0].message.content.strip()
+        # Parse the JSON response
+        import json
+        result = json.loads(analysis)
+        tone = result["tone"].lower()
+        themes = result["themes"]
+        print(f"Analyzed text: '{text}' | Detected tone: {tone} | Themes: {themes}")
+        return tone, themes
+    except Exception as e:
+        print(f"Error with OpenAI analysis: {e}")
+        # Fallback to simple keyword-based analysis
+        text_lower = text.lower()
+        satirical_keywords = ["fail", "lose", "mess", "wrong", "disappoint", "rage", "scandal", "crisis", "collapse"]
+        humorous_keywords = ["distract", "ignore", "forget", "walk", "turn", "funny", "joke", "muscle", "lol"]
+        positive_keywords = ["win", "success", "great", "awesome", "transform", "smart", "victory", "achievement", "breakthrough"]
+        
+        if any(keyword in text_lower for keyword in satirical_keywords):
+            tone = "satirical"
+        elif any(keyword in text_lower for keyword in humorous_keywords):
+            tone = "humorous"
+        elif any(keyword in text_lower for keyword in positive_keywords):
+            tone = "positive"
+        else:
+            tone = "humorous"
 
-def generate_caption_with_llama(text, tone):
-    headers = {
-        "Authorization": f"Bearer {LLAMA_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    prompt = f"Generate a {tone} meme caption for the topic: {text}. "
-    if tone == "satirical":
-        prompt += "Create a two-part caption showing contrast (e.g., 'When X fails / When Y succeeds')."
-    elif tone == "positive":
+        themes = []
+        if "distract" in text_lower or "ignore" in text_lower or "chasing" in text_lower:
+            themes.append("distraction")
+        if "interrupt" in text_lower:
+            themes.append("interruption")
+        if "transform" in text_lower or "grow" in text_lower or "progress" in text_lower:
+            themes.append("transformation")
+        if "rage" in text_lower or "frustrat" in text_lower:
+            themes.append("rage")
+        if "compare" in text_lower or "strength" in text_lower or "muscle" in text_lower:
+            themes.append("comparison")
+        if "disapprove" in text_lower or "disappoint" in text_lower or "realize" in text_lower:
+            themes.append("disapproval")
+        if "smart" in text_lower or "improve" in text_lower:
+            themes.append("self-improvement")
+        if "contrast" in text_lower or "prefer" in text_lower:
+            themes.append("contrast")
+        if "win" in text_lower or "victory" in text_lower or "achieve" in text_lower:
+            themes.append("victory")
+        if "fail" in text_lower or "crisis" in text_lower or "scandal" in text_lower:
+            themes.append("failure")
+
+        print(f"Analyzed text: '{text}' | Detected tone: {tone} | Themes: {themes} | (Fallback analysis)")
+        return tone, themes
+
+def generate_caption_with_openai(text, tone, layout):
+    prompt = f"Analyze the following text and determine its emotional tone (satirical, humorous, positive) and specific themes (e.g., distraction, transformation, rage, victory, interruption, self-improvement). Focus on the most dominant emotion and avoid overgeneralizing to 'distraction'. Return the result as a JSON object with 'tone' and 'themes' keys: {text}"
+    if layout == "two_panel":
+        prompt += "Create a two-part caption (e.g., 'When X fails / When Y succeeds')."
+    elif layout == "three_panel":
+        prompt += "Create a three-part caption (e.g., 'X / Ignoring Y / Chasing Z')."
+    elif layout == "five_panel":
+        prompt += "Create a five-part caption showing progression (e.g., 'Step 1: X / Step 2: Y / ...')."
+    else:  # single
         prompt += "Create a single celebratory caption (e.g., 'X wins!')."
-    else:  # humorous
-        prompt += "Create a three-part caption for a distracted boyfriend meme (e.g., 'X / Ignoring Y / Chasing Z')."
-    
-    data = {
-        "model": "meta-llama/Llama-3-8b-chat-hf",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 100,
-        "temperature": 0.7
-    }
     
     try:
-        response = requests.post(LLAMA_API_URL, headers=headers, json=data)
-        response.raise_for_status()
-        caption_text = response.json()["choices"][0]["message"]["content"].strip()
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Use "gpt-4" if available
+            messages=[
+                {"role": "system", "content": "You are a creative assistant that generates funny and contextually appropriate meme captions."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=150,
+            temperature=0.7
+        )
+        caption_text = response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"Error with LLaMA API: {e}")
-        print(f"Response text: {e.response.text if e.response else 'No response text'}")
+        print(f"Error with OpenAI Chat API: {e}")
         # Fallback to simple generation
         words = text.split()
         subject = words[0].lower() if words else "it"
-        if tone == "satirical":
+        if layout == "two_panel":
             action = words[1].lower() if len(words) > 1 else "fails"
             opposite_action = "succeeds" if "fail" in action else "wins" if "lose" in action else "works"
             return [f"When {subject} {action}", f"When {subject} {opposite_action}"]
-        elif tone == "positive":
-            return [f"{subject.capitalize()} wins!"]
-        else:
+        elif layout == "three_panel":
             action = words[1].lower() if len(words) > 1 else "distracts"
             secondary = words[2].lower() if len(words) > 2 else "something"
             return [subject.capitalize(), f"Ignoring {action}", f"Chasing {secondary}"]
-    
+        elif layout == "five_panel":
+            return [f"Step 1: {subject}", f"Step 2: Trying", f"Step 3: Growing", f"Step 4: Stronger", f"Step 5: Success"]
+        else:
+            return [f"{subject.capitalize()} wins!"]
+
     # Post-process captions
-    if tone == "satirical":
+    if layout == "two_panel":
         captions = caption_text.split("/")
         if len(captions) != 2:
             words = text.split()
@@ -103,13 +179,7 @@ def generate_caption_with_llama(text, tone):
             action = words[1].lower() if len(words) > 1 else "fails"
             opposite_action = "succeeds" if "fail" in action else "wins" if "lose" in action else "works"
             captions = [f"When {subject} {action}", f"When {subject} {opposite_action}"]
-    elif tone == "positive":
-        captions = [caption_text]
-        if not captions[0]:
-            words = text.split()
-            subject = words[0].capitalize() if words else "Victory"
-            captions = [f"{subject} wins!"]
-    else:  # humorous
+    elif layout == "three_panel":
         captions = caption_text.split("/")
         if len(captions) != 3:
             words = text.split()
@@ -117,7 +187,19 @@ def generate_caption_with_llama(text, tone):
             action = words[1].lower() if len(words) > 1 else "distracts"
             secondary = words[2].lower() if len(words) > 2 else "something"
             captions = [subject, f"Ignoring {action}", f"Chasing {secondary}"]
-    
+    elif layout == "five_panel":
+        captions = caption_text.split("/")
+        if len(captions) != 5:
+            words = text.split()
+            subject = words[0].lower() if words else "it"
+            captions = [f"Step 1: {subject}", f"Step 2: Trying", f"Step 3: Growing", f"Step 4: Stronger", f"Step 5: Success"]
+    else:
+        captions = [caption_text]
+        if not captions[0]:
+            words = text.split()
+            subject = words[0].capitalize() if words else "Victory"
+            captions = [f"{subject} wins!"]
+
     return [cap.strip() for cap in captions]
 
 def detect_text_regions(image_path, layout):
@@ -166,41 +248,65 @@ def detect_text_regions(image_path, layout):
         return [(10, img_height // 2, img_width - 20, 50)]
 
 def generate_meme(text, output_format="1:1"):
-    tone = analyze_text(text)
-    # Select template based on tone with preference for existing files
-    available_templates = [t for t in TEMPLATES.values() if t["tone"] == tone and os.path.exists(t["path"])]
-    template = available_templates[0] if available_templates else next((t for t in TEMPLATES.values() if os.path.exists(t["path"])), TEMPLATES["success_kid"])
-    template_path = template["path"]
-    layout = template["layout"]
+    tone, themes = analyze_text(text)
+    
+    # Select the best template based on tone and themes
+    best_template = None
+    max_theme_match = 0
+    for template_name, template_info in TEMPLATES.items():
+        if template_info["tone"] != tone:
+            continue
+        # Count matching themes
+        theme_match = sum(1 for theme in themes if theme in template_info["themes"])
+        if theme_match > max_theme_match and os.path.exists(template_info["path"]):
+            max_theme_match = theme_match
+            best_template = template_info
+    
+    # If no suitable template is found, use OpenAI DALL·E to generate one
+    if best_template is None:
+        # Default to a generic template for the tone if no themes match
+        available_templates = [t for t in TEMPLATES.values() if t["tone"] == tone and os.path.exists(t["path"])]
+        if available_templates:
+            best_template = available_templates[0]
+        else:
+            # Use DALL·E to generate a context-specific template
+            layout = "two_panel" if tone == "satirical" else "three_panel" if tone == "humorous" else "single"
+            if "transformation" in themes:
+                layout = "five_panel"
+            try:
+                prompt = f"A {tone} meme template with a {layout} layout, styled like a classic internet meme, featuring clean and simple characters, emphasizing the theme of {', '.join(themes) if themes else tone}, no pre-existing text"
+                response = openai_client.images.generate(
+                    model="dall-e-3",
+                    prompt=prompt,
+                    size="1024x1024",
+                    n=1,
+                    response_format="url"
+                )
+                image_url = response.data[0].url
+                response = requests.get(image_url)
+                img = Image.open(io.BytesIO(response.content)).convert("RGB")
+                # Save with a unique name based on tone and themes
+                theme_suffix = "_".join(themes) if themes else tone
+                new_template_path = os.path.join(TEMPLATES_DIR, f"{tone}_{theme_suffix}_generated.jpg")
+                img.save(new_template_path, format="JPEG", quality=95)
+                best_template = {
+                    "path": new_template_path,
+                    "tone": tone,
+                    "layout": layout,
+                    "themes": themes
+                }
+                print(f"Generated new template at {new_template_path}")
+            except Exception as e:
+                print(f"Error with DALL·E API: {e}")
+                # Fallback to success_kid as a last resort
+                best_template = TEMPLATES["incredibles_disapproval"]
+                if not os.path.exists(best_template["path"]):
+                    raise FileNotFoundError("Default template 'incredible_disapproal.jpg' not found. Please ensure templates are in backend/templates/.")
+    
+    template_path = best_template["path"]
+    layout = best_template["layout"]
 
-    # Fallback to OpenAI DALL·E if no matching template exists or file is missing
-    if not os.path.exists(template_path) or not any(t["tone"] == tone for t in TEMPLATES.values()):
-        try:
-            response = openai_client.images.generate(
-                model="dall-e-3",
-                prompt=f"A {tone} meme template with {layout} layout, styled like a classic internet meme, featuring clean and simple characters, emphasizing a {tone} theme, no pre-existing text",
-                size="1024x1024",
-                n=1,
-                response_format="url"
-            )
-            image_url = response.data[0].url
-            response = requests.get(image_url)
-            img = Image.open(io.BytesIO(response.content)).convert("RGB")
-            # Save with a unique name based on tone and layout as JPEG
-            new_template_path = os.path.join(TEMPLATES_DIR, f"{tone}_{layout}_generated.jpg")
-            img.save(new_template_path, format="JPEG", quality=95)
-            template_path = new_template_path
-            print(f"Generated new template at {new_template_path}")
-        except Exception as e:
-            print(f"Error with DALL·E API: {e}")
-            # Fallback to default template if DALL·E fails
-            template_path = TEMPLATES["success_kid"]["path"]
-            layout = TEMPLATES["success_kid"]["layout"]
-            img = Image.open(template_path).convert("RGB")
-
-    else:
-        img = Image.open(template_path).convert("RGB")
-
+    img = Image.open(template_path).convert("RGB")
     draw = ImageDraw.Draw(img)
 
     # Load font
@@ -230,7 +336,7 @@ def generate_meme(text, output_format="1:1"):
                 font = ImageFont.load_default()
                 break
 
-    captions = generate_caption_with_llama(text, tone)
+    captions = generate_caption_with_openai(text, tone, layout)
     for i, (region, caption) in enumerate(zip(text_regions, captions)):
         x, y, w, h = region
         font = fit_text(caption.upper(), w, font, initial_font_size)

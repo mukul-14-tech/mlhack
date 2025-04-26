@@ -1,18 +1,17 @@
-# frontend/app.py
 from flask import Flask, render_template, request, send_file
-from backend import analyze_topic, generate_meme, overlay_text
+from backend.meme_generator import generate_meme
 import os
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+app = Flask(__name__, template_folder="templates", static_folder="frontend/static")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        topic = request.form["topic"]
-        analysis = analyze_topic(topic)
-        meme_data = generate_meme(analysis)
-        meme_path = overlay_text(meme_data, "frontend/static/output_meme.jpg")
-        return render_template("index.html", meme_url="/static/output_meme.jpg")
+        topic = request.form.get("topic")
+        output_format = request.form.get("output_format", "1:1")
+        if topic:
+            meme_path = generate_meme(topic, output_format=output_format)
+            return render_template("index.html", meme_url=f"/{meme_path}")
     return render_template("index.html", meme_url=None)
 
 if __name__ == "__main__":
