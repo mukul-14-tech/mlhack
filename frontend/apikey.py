@@ -1,0 +1,2 @@
+openai_api_key = "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"
+llma_key = "9e7193fe-3a23-49db-955c-acd19db15f3f"

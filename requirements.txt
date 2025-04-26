@@ -1,0 +1,8 @@
+streamlit
+transformers
+pillow
+opencv-python-headless
+torch
+diffusers
+openai
+requests

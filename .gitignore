@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+**/_pycache_/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+
+# VSCode settings (optional, if you're using VSCode)
+.vscode/
+
+# MacOS system files (optional, just in case)
+.DS_Store
+
+# Jupyter Notebook checkpoints (optional if using notebooks)
+.ipynb_checkpoints/
+
+# Pytest cache (optional if using pytest)
+.pytest_cache/
+
+# MyPy cache (optional if using type checking)
+.mypy_cache/
+
+# Build files (optional if packaging the project)
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
